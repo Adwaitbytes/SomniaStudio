@@ -6,6 +6,13 @@ import { promisify } from "util";
 import * as fs from "fs";
 import * as path from "path";
 import { privateKeyToAccount } from "viem/accounts";
+import { resolveOpenZeppelinImportSync, preloadOpenZeppelinContracts } from "../../../lib/openzeppelin-resolver";
+
+// Pre-load OpenZeppelin contracts for production deployment
+// This bundles all contracts into the app so they work without node_modules
+if (typeof window === 'undefined') {
+    preloadOpenZeppelinContracts();
+}
 
 // --- CHAIN DEFINITIONS ---
 const somniaTestnet = defineChain({
@@ -82,21 +89,26 @@ async function compileSolidityServerless(sourceCode: string, fileName?: string):
             }
         };
 
-        // Import callback for OpenZeppelin and other dependencies
+        // PRODUCTION-READY Import Resolver
+        // Works WITHOUT node_modules (uses virtual filesystem + CDN fallback)
         function findImports(importPath: string) {
+            console.log(`🔍 Resolving import: ${importPath}`);
+            
             // Handle OpenZeppelin imports
             if (importPath.startsWith('@openzeppelin/')) {
-                try {
-                    const ozPath = path.join(process.cwd(), 'node_modules', importPath);
-                    if (fs.existsSync(ozPath)) {
-                        return {
-                            contents: fs.readFileSync(ozPath, 'utf8')
-                        };
-                    }
-                } catch (e) {
-                    // Fallback: return error
+                // Use virtual filesystem resolver (works in production)
+                const result = resolveOpenZeppelinImportSync(importPath);
+                
+                if ('contents' in result) {
+                    console.log(`✅ Resolved: ${importPath}`);
+                    return result;
+                } else {
+                    console.error(`❌ Failed to resolve: ${importPath}`);
+                    return result;
                 }
             }
+            
+            // Handle relative imports (if any)
             return { error: `File not found: ${importPath}` };
         }
 

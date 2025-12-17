@@ -89,16 +89,26 @@
       "txHash": "0x0826800d9795af6c7c471787951a88db871d90227fbdfcad9f4f57d9fff4aea9",
       "timestamp": "2025-12-17T08:49:30.634Z",
       "id": "dep_1765961370655_xczpgc107"
+    },
+    {
+      "address": "0xa5497b0801d9ec7d9a30e6c39e04ddd3ddf1cbaa",
+      "contractName": "GenContract",
+      "deployer": "0xa4fa024fac779dbc7b99f146de68bff4a8c7bb32",
+      "network": "testnet",
+      "gasUsed": "8949620",
+      "txHash": "0xb31966158fcb46be3eb9cf4760af6632874195b9257a7d8bf11afc196b34e29f",
+      "timestamp": "2025-12-17T09:32:16.676Z",
+      "id": "dep_1765963937036_l34b4vkys"
     }
   ],
   "users": {
     "0xa4fa024fac779dbc7b99f146de68bff4a8c7bb32": {
       "address": "0xa4fa024fac779dbc7b99f146de68bff4a8c7bb32",
       "firstDeployment": "2025-12-10T15:48:37.263Z",
-      "totalDeployments": 9,
-      "totalGasUsed": "66595933",
+      "totalDeployments": 10,
+      "totalGasUsed": "75545553",
       "templates": {},
-      "lastDeployment": "2025-12-17T08:49:30.634Z"
+      "lastDeployment": "2025-12-17T09:32:16.676Z"
     }
   }
 }
