@@ -13,7 +13,6 @@ load_dotenv()
 CHAINGPT_API_KEY = os.getenv("CHAINGPT_API_KEY") 
 
 CONTRACTS_DIR = "./contracts"
-CONTRACT_FILENAME = "GenContract.sol"
 
 def clean_code_block(text):
     # Strips markdown code blocks
@@ -34,9 +33,9 @@ async def main():
     prompt = input(">> What contract do you want? (e.g. 'A token named PizzaCoin'): ")
     
     # 1. GENERATE
-    print("\n🧠 Generatiing Smart Contract code...")
+    print("\n🧠 Generating Smart Contract code...")
     request = SmartContractGeneratorRequestModel(
-        question=f"{prompt}. Name the contract 'GenContract'. Ensure Solidity ^0.8.20.",
+        question=f"{prompt}. Use Solidity ^0.8.20 and follow best practices.",
         chatHistory=ChatHistoryMode.OFF
     )
     
@@ -52,9 +51,14 @@ async def main():
 
     code = clean_code_block(resp.data.bot)
     
+    # Extract contract name from generated code
+    contract_name_match = re.search(r'contract\s+(\w+)', code)
+    contract_name = contract_name_match.group(1) if contract_name_match else "GenContract"
+    contract_filename = f"{contract_name}.sol"
+    
     # 2. SAVE TO FILE
     os.makedirs(CONTRACTS_DIR, exist_ok=True)
-    file_path = os.path.join(CONTRACTS_DIR, CONTRACT_FILENAME)
+    file_path = os.path.join(CONTRACTS_DIR, contract_filename)
     
     # Remove old file to be safe
     if os.path.exists(file_path):

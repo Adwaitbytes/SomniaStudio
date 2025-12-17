@@ -80,14 +80,15 @@ async function testContractGeneration(prompt, expectedFeatures = [], mustCompile
     console.log(`   - Length: ${code.length} characters`);
     console.log(`   - Lines: ${code.split('\n').length}`);
     
-    // 2. Validate contract name
-    console.log("\n2️⃣ Validating contract name...");
-    const hasCorrectName = /contract\s+GenContract\s+/.test(code);
-    if (!hasCorrectName) {
-      console.error("❌ Contract name is not 'GenContract'");
-      return { success: false, stage: 'validate_name', error: 'Invalid contract name' };
+    // 2. Validate contract name (extract it)
+    console.log("\n2️⃣ Extracting contract name...");
+    const contractMatch = code.match(/contract\s+(\w+)\s+/);
+    if (!contractMatch) {
+      console.error("❌ No contract declaration found");
+      return { success: false, stage: 'validate_name', error: 'No contract found' };
     }
-    console.log("✅ Contract name is correct: GenContract");
+    const contractName = contractMatch[1];
+    console.log(`✅ Contract name: ${contractName}`);
     
     // 3. Check expected features
     console.log("\n3️⃣ Checking expected features...");

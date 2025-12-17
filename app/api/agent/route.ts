@@ -54,17 +54,18 @@ const solc = require('solc');
 // Check if we're running in a serverless/read-only environment
 const IS_SERVERLESS = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
 
-async function compileSolidityServerless(sourceCode: string): Promise<{ abi: any[]; bytecode: string }> {
+async function compileSolidityServerless(sourceCode: string, fileName?: string): Promise<{ abi: any[]; bytecode: string; contractName: string }> {
     try {
         // Extract contract name
         const contractNameMatch = sourceCode.match(/contract\s+(\w+)\s+(?:is\s+)?/);
         const contractName = contractNameMatch ? contractNameMatch[1] : "GenContract";
+        const solidityFileName = fileName || `${contractName}.sol`;
 
         // Prepare input for solc compiler
         const input = {
             language: 'Solidity',
             sources: {
-                'GenContract.sol': {
+                [solidityFileName]: {
                     content: sourceCode
                 }
             },
@@ -111,7 +112,7 @@ async function compileSolidityServerless(sourceCode: string): Promise<{ abi: any
         }
 
         // Extract the compiled contract
-        const contract = output.contracts['GenContract.sol'][contractName];
+        const contract = output.contracts[solidityFileName][contractName];
         
         if (!contract) {
             throw new Error(`Contract ${contractName} not found in compilation output`);
@@ -119,7 +120,8 @@ async function compileSolidityServerless(sourceCode: string): Promise<{ abi: any
 
         return {
             abi: contract.abi,
-            bytecode: contract.evm.bytecode.object
+            bytecode: contract.evm.bytecode.object,
+            contractName: contractName
         };
     } catch (error: any) {
         console.error('Serverless compilation error:', error);
@@ -127,25 +129,25 @@ async function compileSolidityServerless(sourceCode: string): Promise<{ abi: any
     }
 }
 
-async function compileSolidity(sourceCode: string): Promise<{ abi: any[]; bytecode: string }> {
+async function compileSolidity(sourceCode: string): Promise<{ abi: any[]; bytecode: string; contractName: string }> {
     // Fix any incorrectly checksummed addresses before compilation
     const fixedSourceCode = fixAddressChecksums(sourceCode);
-    
-    // Use serverless compilation if in read-only environment
-    if (IS_SERVERLESS) {
-        console.log('🚀 Using serverless compilation (solc-js)');
-        return compileSolidityServerless(fixedSourceCode);
-    }
-    
-    console.log('🔧 Using local Hardhat compilation');
-
     
     // Extract contract name from source
     const contractNameMatch = fixedSourceCode.match(/contract\s+(\w+)/); 
     const contractName = contractNameMatch ? contractNameMatch[1] : "GenContract";
+    const fileName = `${contractName}.sol`;
     
-    // Write source to contracts folder
-    const contractPath = path.join(process.cwd(), "contracts", "GenContract.sol");
+    // Use serverless compilation if in read-only environment
+    if (IS_SERVERLESS) {
+        console.log('🚀 Using serverless compilation (solc-js)');
+        return compileSolidityServerless(fixedSourceCode, fileName);
+    }
+    
+    console.log('🔧 Using local Hardhat compilation');
+    
+    // Write source to contracts folder with dynamic name
+    const contractPath = path.join(process.cwd(), "contracts", fileName);
     fs.writeFileSync(contractPath, fixedSourceCode, "utf-8");
     
     try {
@@ -160,13 +162,13 @@ async function compileSolidity(sourceCode: string): Promise<{ abi: any[]; byteco
             process.cwd(), 
             "artifacts", 
             "contracts", 
-            "GenContract.sol",
+            fileName,
             `${contractName}.json`
         );
         
         if (!fs.existsSync(artifactPath)) {
             // Try to find any compiled artifact in the folder
-            const artifactDir = path.join(process.cwd(), "artifacts", "contracts", "GenContract.sol");
+            const artifactDir = path.join(process.cwd(), "artifacts", "contracts", fileName);
             if (fs.existsSync(artifactDir)) {
                 const files = fs.readdirSync(artifactDir).filter(f => f.endsWith(".json") && !f.includes(".dbg."));
                 if (files.length > 0) {
@@ -174,6 +176,7 @@ async function compileSolidity(sourceCode: string): Promise<{ abi: any[]; byteco
                     return {
                         abi: artifact.abi,
                         bytecode: artifact.bytecode,
+                        contractName: contractName
                     };
                 }
             }
@@ -185,6 +188,7 @@ async function compileSolidity(sourceCode: string): Promise<{ abi: any[]; byteco
         return {
             abi: artifact.abi,
             bytecode: artifact.bytecode,
+            contractName: contractName
         };
     } catch (error: any) {
         // Parse Hardhat errors for better messages
@@ -387,9 +391,10 @@ Generate a PRODUCTION-READY, DEPLOYABLE Solidity smart contract that is 100% cor
 CRITICAL DEPLOYMENT REQUIREMENTS (FAILURE = REJECTED):
 ═══════════════════════════════════════════════════════════════════
 
-1. CONTRACT NAME: MUST be exactly 'GenContract' (case-sensitive)
-   ✅ CORRECT: contract GenContract is ERC20, Ownable {
-   ❌ WRONG: contract MyToken, contract TokenContract, contract Token
+1. CONTRACT NAME: 
+   - Use a meaningful name based on the contract purpose
+   - If user specifies a name, use that exact name
+   - Examples: MyToken, StakingContract, NFTCollection, DAO, etc.
 
 2. SOLIDITY VERSION: Use pragma solidity ^0.8.24;
 
@@ -399,18 +404,29 @@ CRITICAL DEPLOYMENT REQUIREMENTS (FAILURE = REJECTED):
    - If user specifies values in prompt, use those exact values
    - Example: constructor() ERC20("MyToken", "MTK") Ownable(msg.sender) {
 
-4. OPENZEPPELIN IMPORTS:
-   ✅ Use: import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+4. OPENZEPPELIN v5.x IMPORTS (CRITICAL - USE CORRECT PATHS):
+   ✅ CORRECT PATHS for OpenZeppelin v5:
+      - ERC20: "@openzeppelin/contracts/token/ERC20/ERC20.sol"
+      - Ownable: "@openzeppelin/contracts/access/Ownable.sol"
+      - ReentrancyGuard: "@openzeppelin/contracts/utils/ReentrancyGuard.sol"
+      - Pausable: "@openzeppelin/contracts/utils/Pausable.sol"
+      - ERC721: "@openzeppelin/contracts/token/ERC721/ERC721.sol"
+      - AccessControl: "@openzeppelin/contracts/access/AccessControl.sol"
+   
+   ❌ WRONG (v4 paths - DO NOT USE):
+      - "@openzeppelin/contracts/security/ReentrancyGuard.sol" (WRONG!)
+      - "@openzeppelin/contracts/security/Pausable.sol" (WRONG!)
+   
    ❌ Never use: import "https://...", import "../node_modules/..."
 
 5. MANDATORY ELEMENTS:
    - SPDX License: // SPDX-License-Identifier: MIT
-   - Receive function: receive() external payable {}
+   - Receive function (if contract handles ETH): receive() external payable {}
    - NatSpec documentation for all public/external functions
    - Proper error handling with require/revert
 
 6. SECURITY REQUIREMENTS:
-   - Use OpenZeppelin's latest patterns (Ownable, ReentrancyGuard, etc.)
+   - Use OpenZeppelin v5.x patterns (Ownable, ReentrancyGuard from /utils/, etc.)
    - Include access control (onlyOwner or AccessControl)
    - Validate all inputs (address != 0, amount > 0, etc.)
    - Use SafeMath patterns (built-in 0.8.x or explicit checks)
@@ -436,7 +452,7 @@ OUTPUT REQUIREMENTS:
 - Must compile with Hardhat + OpenZeppelin v5.x
 - Must be immediately deployable
 
-Generate the complete GenContract now:`;
+Generate the complete contract now:`;
 
             // Try Groq first
             if (GROQ_API_KEY) {
@@ -478,16 +494,11 @@ Generate the complete GenContract now:`;
             generatedCode = generatedCode.replace(/MITpragma/g, "MIT\npragma");
             generatedCode = generatedCode.replace(/;import/g, ";\nimport");
             
-            // 4. Fix contract name if AI didn't follow instructions
+            // 4. Extract contract name (keep whatever AI generated)
             const contractNameRegex = /contract\s+(\w+)\s+(?:is\s+)?/;
             const match = generatedCode.match(contractNameRegex);
-            if (match && match[1] !== "GenContract") {
-                console.log(`⚠️ Auto-fixing contract name from '${match[1]}' to 'GenContract'`);
-                generatedCode = generatedCode.replace(
-                    new RegExp(`contract\\s+${match[1]}\\s+`, 'g'),
-                    'contract GenContract '
-                );
-            }
+            const contractName = match ? match[1] : "GenContract";
+            console.log(`📝 Contract name: ${contractName}`);
             
             // 5. Ensure pragma is correct version
             if (!generatedCode.includes("pragma solidity ^0.8")) {
@@ -508,7 +519,19 @@ Generate the complete GenContract now:`;
                     generatedCode.slice(lastBraceIndex);
             }
             
-            // 7. Validate OpenZeppelin imports format
+            // 7. Fix OpenZeppelin v4 → v5 import path migrations
+            console.log("⚠️ Fixing OpenZeppelin v5 import paths...");
+            generatedCode = generatedCode
+                .replace(
+                    /@openzeppelin\/contracts\/security\/ReentrancyGuard\.sol/g,
+                    "@openzeppelin/contracts/utils/ReentrancyGuard.sol"
+                )
+                .replace(
+                    /@openzeppelin\/contracts\/security\/Pausable\.sol/g,
+                    "@openzeppelin/contracts/utils/Pausable.sol"
+                );
+            
+            // 8. Validate OpenZeppelin imports format (fix URL imports)
             generatedCode = generatedCode.replace(
                 /import\s+['"]https:\/\/[^'"]+openzeppelin[^'"]+['"]/gi,
                 (match) => {
@@ -520,23 +543,26 @@ Generate the complete GenContract now:`;
                 }
             );
             
-            // 8. Add NatSpec if completely missing
+            // 9. Add NatSpec if completely missing
             if (!generatedCode.includes("/**") && !generatedCode.includes("@dev") && !generatedCode.includes("@notice")) {
-                const contractLineIndex = generatedCode.indexOf("contract GenContract");
-                if (contractLineIndex > 0) {
-                    const beforeContract = generatedCode.slice(0, contractLineIndex);
-                    const afterContract = generatedCode.slice(contractLineIndex);
-                    const natspec = `/**
- * @title GenContract
+                const contractMatch = generatedCode.match(/contract\s+(\w+)/);
+                if (contractMatch) {
+                    const contractLineIndex = generatedCode.indexOf(contractMatch[0]);
+                    if (contractLineIndex > 0) {
+                        const beforeContract = generatedCode.slice(0, contractLineIndex);
+                        const afterContract = generatedCode.slice(contractLineIndex);
+                        const natspec = `/**
+ * @title ${contractMatch[1]}
  * @dev ${prompt.slice(0, 100)}${prompt.length > 100 ? '...' : ''}
  * @notice Built with SomniaStudio for Somnia Network
  */
 `;
-                    generatedCode = beforeContract + natspec + afterContract;
+                        generatedCode = beforeContract + natspec + afterContract;
+                    }
                 }
             }
 
-            // 9. Try to compile and catch errors
+            // 10. Try to compile and catch errors
             let compileErrors: any[] = [];
             try {
                 await compileSolidityServerless(generatedCode);
@@ -720,14 +746,31 @@ OUTPUT ONLY the optimized Solidity code. NO explanations, NO markdown.`;
         if (action === "compile") {
             console.log("🔨 Compiling contract code...");
             
+            // Auto-fix OpenZeppelin v5 import paths before compilation
+            let fixedCode = code
+                .replace(
+                    /@openzeppelin\/contracts\/security\/ReentrancyGuard\.sol/g,
+                    "@openzeppelin/contracts/utils/ReentrancyGuard.sol"
+                )
+                .replace(
+                    /@openzeppelin\/contracts\/security\/Pausable\.sol/g,
+                    "@openzeppelin/contracts/utils/Pausable.sol"
+                );
+            
+            if (fixedCode !== code) {
+                console.log("⚠️ Auto-fixed OpenZeppelin v5 import paths");
+            }
+            
             try {
-                const { abi, bytecode } = await compileSolidity(code);
+                const { abi, bytecode, contractName } = await compileSolidity(fixedCode);
                 
                 return NextResponse.json({
                     success: true,
                     abi,
                     bytecode,
-                    contractSize: bytecode.length / 2
+                    contractName,
+                    contractSize: bytecode.length / 2,
+                    code: fixedCode !== code ? fixedCode : undefined // Return fixed code if changed
                 });
             } catch (error: any) {
                 console.error("❌ Compilation failed:", error.message);

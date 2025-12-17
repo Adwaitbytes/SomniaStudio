@@ -69,16 +69,36 @@
       "txHash": "0x5100a2b8427620343e0211d960e5af6d26b2b37554e3e84b51f46fbb7874649c",
       "timestamp": "2025-12-17T07:46:17.238Z",
       "id": "dep_1765957578507_2b7g99798"
+    },
+    {
+      "address": "0x063d247d4954c6d950bc997044548db4aa738fb4",
+      "contractName": "GenContract",
+      "deployer": "0xa4fa024fac779dbc7b99f146de68bff4a8c7bb32",
+      "network": "testnet",
+      "gasUsed": "8949620",
+      "txHash": "0x2e870c8414cdf4ce427c9570d9113df3f3707de139e26cbd31cef4d3e8e57262",
+      "timestamp": "2025-12-17T08:48:23.011Z",
+      "id": "dep_1765961303170_9tyo1joh8"
+    },
+    {
+      "address": "0x18c68e98ac9b1cc14dcdcff7e62bff048bdd2fb9",
+      "contractName": "GenContract",
+      "deployer": "0xa4fa024fac779dbc7b99f146de68bff4a8c7bb32",
+      "network": "testnet",
+      "gasUsed": "14244095",
+      "txHash": "0x0826800d9795af6c7c471787951a88db871d90227fbdfcad9f4f57d9fff4aea9",
+      "timestamp": "2025-12-17T08:49:30.634Z",
+      "id": "dep_1765961370655_xczpgc107"
     }
   ],
   "users": {
     "0xa4fa024fac779dbc7b99f146de68bff4a8c7bb32": {
       "address": "0xa4fa024fac779dbc7b99f146de68bff4a8c7bb32",
       "firstDeployment": "2025-12-10T15:48:37.263Z",
-      "totalDeployments": 7,
-      "totalGasUsed": "43402218",
+      "totalDeployments": 9,
+      "totalGasUsed": "66595933",
       "templates": {},
-      "lastDeployment": "2025-12-17T07:46:17.238Z"
+      "lastDeployment": "2025-12-17T08:49:30.634Z"
     }
   }
 }

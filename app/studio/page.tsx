@@ -458,6 +458,7 @@ export default function StudioPage() {
   const [aiResponse, setAIResponse] = useState<string | null>(null);
   const [aiLoading, setAILoading] = useState(false);
   const [teachModeContent, setTeachModeContent] = useState<any>(null);
+  const [aiMode, setAIMode] = useState<"architect" | "researcher">("architect");
   const [showDeployModal, setShowDeployModal] = useState(false);
   const [deployedAddress, setDeployedAddress] = useState<string | null>(null);
   const [showNewFileModal, setShowNewFileModal] = useState(false);
@@ -726,14 +727,17 @@ export default function StudioPage() {
     if (!aiPrompt.trim()) return;
     
     setAILoading(true);
-    addConsoleOutput(`🤖 Generating: "${aiPrompt.slice(0, 50)}..."`);
+    
+    // Determine action based on mode
+    const action = aiMode === "architect" ? "generate" : "research";
+    addConsoleOutput(`🤖 ${aiMode === "architect" ? "Generating contract" : "Researching"}: "${aiPrompt.slice(0, 50)}..."`);
 
     try {
       let res = await fetch("/api/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "generate",
+          action,
           userAddress: walletAddress || "anonymous",
           prompt: aiPrompt,
         }),
@@ -760,22 +764,42 @@ export default function StudioPage() {
       const result = await res.json();
 
       if (result.success) {
-        setCode(result.code);
-        addConsoleOutput(`✅ Contract generated successfully`);
-        setAIResponse("Contract generated! Review the code and compile when ready.");
-        
-        // Track AI usage
-        if (userUUID) {
-          analytics.trackAIPrompt({
-            userId: userUUID,
-            promptType: "generate",
-            promptText: aiPrompt,
-            responseText: result.code,
-          });
-          console.log('✅ AI prompt tracked (generate)');
+        if (aiMode === "architect") {
+          // Architect mode: Generate contract code
+          setCode(result.code);
+          addConsoleOutput(`✅ Contract generated successfully`);
+          setAIResponse("✅ Contract generated! Review the code and compile when ready.");
+          
+          // Track AI usage
+          if (userUUID) {
+            analytics.trackAIPrompt({
+              userId: userUUID,
+              promptType: "generate",
+              promptText: aiPrompt,
+              responseText: result.code,
+            });
+            console.log('✅ AI prompt tracked (generate)');
+          }
+        } else {
+          // Researcher mode: Show answer
+          const answer = result.result || result.answer || result.response || "No answer received";
+          setAIResponse(answer);
+          addConsoleOutput(`✅ Research complete`);
+          
+          // Track research query
+          if (userUUID) {
+            analytics.trackAIPrompt({
+              userId: userUUID,
+              promptType: "research",
+              promptText: aiPrompt,
+              responseText: answer,
+            });
+            console.log('✅ AI prompt tracked (research)');
+          }
         }
       } else {
-        addConsoleOutput(`❌ Generation failed: ${result.error}`);
+        addConsoleOutput(`❌ ${aiMode === "architect" ? "Generation" : "Research"} failed: ${result.error}`);
+        setAIResponse(`❌ Error: ${result.error || "Unknown error"}`);
       }
     } catch (err: any) {
       addConsoleOutput(`❌ Error: ${err.message}`);
@@ -992,9 +1016,20 @@ Look for:
       const result = await res.json();
 
       if (result.success) {
-        const response = result.answer || result.response || "Analysis complete";
+        const response = result.result || result.answer || result.response || "Analysis complete";
         setAIResponse(response);
         addConsoleOutput(`✅ ${action.charAt(0).toUpperCase() + action.slice(1)} analysis complete`);
+        
+        // Track the analysis
+        if (userUUID) {
+          analytics.trackAIPrompt({
+            userId: userUUID,
+            promptType: action,
+            promptText: prompts[action],
+            responseText: response,
+          });
+          console.log(`✅ AI prompt tracked (${action})`);
+        }
         
         // Ensure AI panel is visible
         if (!aiPanelOpen) {
@@ -1346,13 +1381,39 @@ Look for:
                   </button>
                 </div>
 
+                {/* Mode Tabs */}
+                <div className={`flex gap-2 mb-4 p-1 rounded-lg ${isDark ? "bg-white/5" : "bg-gray-100"}`}>
+                  <button
+                    onClick={() => setAIMode("architect")}
+                    className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-all ${
+                      aiMode === "architect"
+                        ? "bg-purple-600 text-white shadow-lg"
+                        : isDark ? "text-gray-400 hover:text-white" : "text-gray-600 hover:text-gray-900"
+                    }`}
+                  >
+                    <Code2 size={14} className="inline mr-2" />
+                    Architect
+                  </button>
+                  <button
+                    onClick={() => setAIMode("researcher")}
+                    className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-all ${
+                      aiMode === "researcher"
+                        ? "bg-purple-600 text-white shadow-lg"
+                        : isDark ? "text-gray-400 hover:text-white" : "text-gray-600 hover:text-gray-900"
+                    }`}
+                  >
+                    <BookOpen size={14} className="inline mr-2" />
+                    Researcher
+                  </button>
+                </div>
+
                 {/* AI Input */}
                 <div className="flex gap-2">
                   <input
                     value={aiPrompt}
                     onChange={(e) => setAIPrompt(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleAIGenerate()}
-                    placeholder="Describe your contract..."
+                    placeholder={aiMode === "architect" ? "Describe your contract..." : "Ask anything about Web3, Solidity..."}
                     className={`flex-1 px-3 py-2 rounded-lg text-sm ${
                       isDark 
                         ? "bg-white/5 border border-white/10 focus:border-purple-500" 
